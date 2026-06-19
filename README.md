@@ -7,6 +7,7 @@ A Rust implementation of [lswt](https://sr.ht/~leon_plickat/lswt/) - list Waylan
 - List all Wayland toplevel windows with their titles and app-ids
 - Support for multiple Wayland protocols:
   - `zwlr-foreign-toplevel-management-unstable-v1` (wlroots)
+  - `treeland-foreign-toplevel-manager-v1` (Deepin/Treeland)
   - `ext-foreign-toplevel-list-v1` (standardized protocol, when available)
 - Multiple output formats:
   - Normal (human-readable table)
@@ -19,9 +20,10 @@ A Rust implementation of [lswt](https://sr.ht/~leon_plickat/lswt/) - list Waylan
 
 Your Wayland compositor must support at least one of the following protocols:
 - `zwlr_foreign_toplevel_management_unstable_v1` version 3 or higher
+- `treeland_foreign_toplevel_manager_v1` version 1 or higher (Deepin/Treeland)
 - `ext_foreign_toplevel_list_v1` version 1 or higher
 
-Most wlroots-based compositors (Sway, river, Hyprland, etc.) support these protocols.
+Most wlroots-based compositors (Sway, river, Hyprland, etc.) and Deepin's Treeland support these protocols.
 
 ## Installation
 
@@ -52,6 +54,7 @@ lswt --custom taA
 
 # Force specific protocol
 lswt --force-protocol zwlr-foreign-toplevel-management-unstable-v1
+lswt --force-protocol treeland-foreign-toplevel-manager-v1
 ```
 
 ### Options
