@@ -1,7 +1,7 @@
 use crate::cli::Mode;
 use crate::protocols::common::{parse_state_array, print_state_change};
 use crate::protocols::AppState;
-use crate::toplevel::Toplevel;
+use crate::toplevel::{Toplevel, ToplevelHandle};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use wayland_client::{Connection, Dispatch, QueueHandle};
 use wayland_protocols_wlr::foreign_toplevel::v1::client::{
@@ -52,13 +52,26 @@ impl Dispatch<ZwlrForeignToplevelManagerV1, ()> for AppState {
 impl Dispatch<ZwlrForeignToplevelHandleV1, ToplevelHandleData> for AppState {
     fn event(
         state: &mut Self,
-        _handle: &ZwlrForeignToplevelHandleV1,
+        handle: &ZwlrForeignToplevelHandleV1,
         event: zwlr_foreign_toplevel_handle_v1::Event,
         data: &ToplevelHandleData,
         _: &Connection,
         _: &QueueHandle<Self>,
     ) {
         let toplevel_id = data.id;
+        let handle_idx = toplevel_id; // Use toplevel_id as index
+
+        // Save handle if not already saved
+        while state.handles.len() <= handle_idx {
+            state.handles.push(None);
+        }
+        if state.handles[handle_idx].is_none() {
+            state.handles[handle_idx] = Some(ToplevelHandle::Wlr(handle.clone()));
+            // Update toplevel with handle_id
+            if let Some(toplevel) = state.find_toplevel_mut(toplevel_id) {
+                toplevel.handle_id = Some(handle_idx);
+            }
+        }
 
         match event {
             zwlr_foreign_toplevel_handle_v1::Event::Title { title } => {

@@ -1,7 +1,7 @@
 use crate::cli::{Args, OutputFormat};
 use crate::output::OutputWriter;
 use crate::protocols::{AppState, UsedProtocol};
-use crate::toplevel::Toplevel;
+use crate::toplevel::{perform_action, SharedHandles, Toplevel, ToplevelAction};
 use anyhow::Result;
 use rustyline::error::ReadlineError;
 use rustyline::DefaultEditor;
@@ -11,10 +11,12 @@ pub fn run_repl(args: &Args) -> Result<()> {
     // Create connection and event queue in main thread
     let conn = wayland_client::Connection::connect_to_env()?;
 
-    // Shared state for toplevels
+    // Shared state for toplevels and handles
     let shared_toplevels: Arc<Mutex<Vec<Toplevel>>> = Arc::new(Mutex::new(Vec::new()));
+    let shared_handles: SharedHandles = Arc::new(Mutex::new(Vec::new()));
     let shared_protocol: Arc<Mutex<UsedProtocol>> = Arc::new(Mutex::new(UsedProtocol::None));
     let toplevels_for_thread = shared_toplevels.clone();
+    let handles_for_thread = shared_handles.clone();
     let protocol_for_thread = shared_protocol.clone();
 
     // Clone args for the background thread
@@ -32,6 +34,7 @@ pub fn run_repl(args: &Args) -> Result<()> {
             next_id: 0,
             conn: conn.clone(),
             output_names: std::collections::HashMap::new(),
+            handles: Vec::new(),
         };
 
         // Initialize: bind protocols and get initial state
@@ -63,6 +66,8 @@ pub fn run_repl(args: &Args) -> Result<()> {
         {
             let mut toplevels = toplevels_for_thread.lock().unwrap();
             *toplevels = app.toplevels.clone();
+            let mut handles = handles_for_thread.lock().unwrap();
+            *handles = app.handles.clone();
             let mut protocol = protocol_for_thread.lock().unwrap();
             *protocol = app.used_protocol;
         }
@@ -77,6 +82,8 @@ pub fn run_repl(args: &Args) -> Result<()> {
             // Update shared state
             let mut toplevels = toplevels_for_thread.lock().unwrap();
             *toplevels = app.toplevels.clone();
+            let mut handles = handles_for_thread.lock().unwrap();
+            *handles = app.handles.clone();
         }
     });
 
@@ -146,6 +153,71 @@ pub fn run_repl(args: &Args) -> Result<()> {
                                 let protocol = shared_protocol.lock().unwrap();
                                 println!("Protocol: {:?}", *protocol);
                             }
+                            // Window control commands
+                            Some("maximize") | Some("max") => {
+                                handle_action(
+                                    &shared_toplevels,
+                                    &shared_handles,
+                                    &parts[1..],
+                                    ToplevelAction::Maximize,
+                                );
+                            }
+                            Some("unmaximize") | Some("unmax") => {
+                                handle_action(
+                                    &shared_toplevels,
+                                    &shared_handles,
+                                    &parts[1..],
+                                    ToplevelAction::UnMaximize,
+                                );
+                            }
+                            Some("minimize") | Some("min") => {
+                                handle_action(
+                                    &shared_toplevels,
+                                    &shared_handles,
+                                    &parts[1..],
+                                    ToplevelAction::Minimize,
+                                );
+                            }
+                            Some("unminimize") | Some("unmin") => {
+                                handle_action(
+                                    &shared_toplevels,
+                                    &shared_handles,
+                                    &parts[1..],
+                                    ToplevelAction::UnMinimize,
+                                );
+                            }
+                            Some("activate") | Some("focus") => {
+                                handle_action(
+                                    &shared_toplevels,
+                                    &shared_handles,
+                                    &parts[1..],
+                                    ToplevelAction::Activate,
+                                );
+                            }
+                            Some("fullscreen") | Some("fs") => {
+                                handle_action(
+                                    &shared_toplevels,
+                                    &shared_handles,
+                                    &parts[1..],
+                                    ToplevelAction::Fullscreen,
+                                );
+                            }
+                            Some("unfullscreen") | Some("unfs") => {
+                                handle_action(
+                                    &shared_toplevels,
+                                    &shared_handles,
+                                    &parts[1..],
+                                    ToplevelAction::UnFullscreen,
+                                );
+                            }
+                            Some("close") => {
+                                handle_action(
+                                    &shared_toplevels,
+                                    &shared_handles,
+                                    &parts[1..],
+                                    ToplevelAction::Close,
+                                );
+                            }
                             _ => {
                                 eprintln!(
                                     "Unknown command: '{}'. Type 'help' for available commands.",
@@ -177,16 +249,73 @@ pub fn run_repl(args: &Args) -> Result<()> {
     Ok(())
 }
 
+fn handle_action(
+    toplevels: &Arc<Mutex<Vec<Toplevel>>>,
+    handles: &SharedHandles,
+    args: &[&str],
+    action: ToplevelAction,
+) {
+    if args.is_empty() {
+        eprintln!("Usage: <command> <id|app-id>");
+        return;
+    }
+
+    let toplevels_guard = toplevels.lock().unwrap();
+
+    // Find toplevel by ID or app-id
+    let toplevel = if let Ok(id) = args[0].parse::<usize>() {
+        toplevels_guard.iter().find(|t| t.id == id)
+    } else {
+        toplevels_guard
+            .iter()
+            .find(|t| t.app_id.as_deref() == Some(args[0]))
+    };
+
+    match toplevel {
+        Some(t) => {
+            let action_name = match action {
+                ToplevelAction::Maximize => "maximize",
+                ToplevelAction::UnMaximize => "unmaximize",
+                ToplevelAction::Minimize => "minimize",
+                ToplevelAction::UnMinimize => "unminimize",
+                ToplevelAction::Activate => "activate",
+                ToplevelAction::Fullscreen => "fullscreen",
+                ToplevelAction::UnFullscreen => "unfullscreen",
+                ToplevelAction::Close => "close",
+            };
+
+            match perform_action(handles, t.id, action) {
+                Ok(_) => println!("{} toplevel #{} ({})", action_name, t.id, t.title_str()),
+                Err(e) => eprintln!("Failed to {}: {}", action_name, e),
+            }
+        }
+        None => {
+            eprintln!("Toplevel '{}' not found", args[0]);
+        }
+    }
+}
+
 fn print_help() {
     println!("Available commands:");
-    println!("  list, ls          - List all toplevels");
-    println!("  list-json, lj     - List all toplevels in JSON format");
-    println!("  info <id>         - Show detailed info for a toplevel by ID");
-    println!("  info <app-id>     - Show detailed info for a toplevel by app-id");
-    println!("  count             - Show number of toplevels");
-    println!("  protocol          - Show current protocol");
-    println!("  help, h           - Show this help");
-    println!("  exit, quit, q     - Exit REPL");
+    println!("  list, ls              - List all toplevels");
+    println!("  list-json, lj         - List all toplevels in JSON format");
+    println!("  info <id>             - Show detailed info for a toplevel by ID");
+    println!("  info <app-id>         - Show detailed info for a toplevel by app-id");
+    println!("  count                 - Show number of toplevels");
+    println!("  protocol              - Show current protocol");
+    println!();
+    println!("Window control commands:");
+    println!("  maximize, max <id>    - Maximize a toplevel");
+    println!("  unmaximize, unmax <id> - Unmaximize a toplevel");
+    println!("  minimize, min <id>    - Minimize a toplevel");
+    println!("  unminimize, unmin <id> - Unminimize a toplevel");
+    println!("  activate, focus <id>  - Activate/focus a toplevel");
+    println!("  fullscreen, fs <id>   - Fullscreen a toplevel");
+    println!("  unfullscreen, unfs <id> - Unfullscreen a toplevel");
+    println!("  close <id>            - Close a toplevel");
+    println!();
+    println!("  help, h               - Show this help");
+    println!("  exit, quit, q         - Exit REPL");
 }
 
 fn show_toplevel_info(toplevels: &[Toplevel], id: usize) {

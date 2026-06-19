@@ -4,7 +4,7 @@ pub mod treeland_foreign_toplevel;
 pub mod wlr_foreign_toplevel;
 
 use crate::cli::{Args, Mode};
-use crate::toplevel::Toplevel;
+use crate::toplevel::{Toplevel, ToplevelHandle};
 use anyhow::Result;
 use std::collections::HashMap;
 
@@ -29,6 +29,7 @@ pub struct AppState {
     pub next_id: usize,
     pub conn: Connection,
     pub output_names: HashMap<u32, String>, // wl_output name -> output name
+    pub handles: Vec<Option<ToplevelHandle>>,
 }
 
 impl AppState {
@@ -43,6 +44,7 @@ impl AppState {
             next_id: 0,
             conn,
             output_names: HashMap::new(),
+            handles: Vec::new(),
         })
     }
 

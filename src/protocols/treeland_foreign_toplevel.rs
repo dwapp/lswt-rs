@@ -1,7 +1,7 @@
 use crate::cli::Mode;
 use crate::protocols::common::{parse_state_array, print_state_change};
 use crate::protocols::AppState;
-use crate::toplevel::Toplevel;
+use crate::toplevel::{Toplevel, ToplevelHandle};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use wayland_client::{Connection, Dispatch, QueueHandle};
 use wayland_protocols_treeland::foreign_toplevel_manager::v1::client::{
@@ -52,7 +52,7 @@ impl Dispatch<TreelandForeignToplevelManagerV1, ()> for AppState {
 impl Dispatch<TreelandForeignToplevelHandleV1, TreelandToplevelHandleData> for AppState {
     fn event(
         state: &mut Self,
-        _handle: &TreelandForeignToplevelHandleV1,
+        handle: &TreelandForeignToplevelHandleV1,
         event: treeland_foreign_toplevel_handle_v1::Event,
         data: &TreelandToplevelHandleData,
         _: &Connection,
@@ -64,6 +64,19 @@ impl Dispatch<TreelandForeignToplevelHandleV1, TreelandToplevelHandleData> for A
         if state.find_toplevel_mut(toplevel_id).is_none() {
             let new_toplevel = Toplevel::new(toplevel_id);
             state.add_toplevel(new_toplevel);
+        }
+
+        // Save handle if not already saved
+        let handle_idx = toplevel_id;
+        while state.handles.len() <= handle_idx {
+            state.handles.push(None);
+        }
+        if state.handles[handle_idx].is_none() {
+            state.handles[handle_idx] = Some(ToplevelHandle::Treeland(handle.clone()));
+            // Update toplevel with handle_id
+            if let Some(toplevel) = state.find_toplevel_mut(toplevel_id) {
+                toplevel.handle_id = Some(handle_idx);
+            }
         }
 
         match event {

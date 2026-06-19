@@ -1,4 +1,5 @@
 use serde::Serialize;
+use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct ToplevelState {
@@ -6,6 +7,26 @@ pub struct ToplevelState {
     pub activated: bool,
     pub maximized: bool,
     pub minimized: bool,
+}
+
+/// Actions that can be performed on a toplevel
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ToplevelAction {
+    Maximize,
+    UnMaximize,
+    Minimize,
+    UnMinimize,
+    Activate,
+    Fullscreen,
+    UnFullscreen,
+    Close,
+}
+
+/// Handle to a toplevel for performing actions
+#[derive(Clone)]
+pub enum ToplevelHandle {
+    Wlr(wayland_protocols_wlr::foreign_toplevel::v1::client::zwlr_foreign_toplevel_handle_v1::ZwlrForeignToplevelHandleV1),
+    Treeland(wayland_protocols_treeland::foreign_toplevel_manager::v1::client::treeland_foreign_toplevel_handle_v1::TreelandForeignToplevelHandleV1),
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -18,6 +39,9 @@ pub struct Toplevel {
     pub outputs: Vec<String>,
     #[serde(skip)]
     pub listed: bool,
+    #[serde(skip)]
+    #[allow(dead_code)]
+    pub handle_id: Option<usize>, // Index into handles vec
 }
 
 impl Toplevel {
@@ -30,6 +54,7 @@ impl Toplevel {
             state: ToplevelState::default(),
             outputs: Vec::new(),
             listed: false,
+            handle_id: None,
         }
     }
 
@@ -73,5 +98,64 @@ impl Toplevel {
 
     pub fn identifier_str(&self) -> &str {
         self.identifier.as_deref().unwrap_or("<NULL>")
+    }
+}
+
+/// Store for toplevel handles, shared between threads
+pub type SharedHandles = Arc<Mutex<Vec<Option<ToplevelHandle>>>>;
+
+/// Perform an action on a toplevel
+pub fn perform_action(
+    handles: &SharedHandles,
+    toplevel_id: usize,
+    action: ToplevelAction,
+) -> Result<(), String> {
+    let handles = handles.lock().unwrap();
+
+    // Find the handle for this toplevel
+    let handle = handles
+        .iter()
+        .find_map(|h| h.as_ref())
+        .ok_or_else(|| format!("No handle found for toplevel {}", toplevel_id))?;
+
+    match handle {
+        ToplevelHandle::Wlr(h) => {
+            match action {
+                ToplevelAction::Maximize => h.set_maximized(),
+                ToplevelAction::UnMaximize => h.unset_maximized(),
+                ToplevelAction::Minimize => h.set_minimized(),
+                ToplevelAction::UnMinimize => h.unset_minimized(),
+                ToplevelAction::Activate => {
+                    // wlr activate requires a seat, we'll use a workaround
+                    // For now, just log that it's not fully supported
+                    return Err(
+                        "Activate requires a seat object (not yet implemented for wlr)".to_string(),
+                    );
+                }
+                ToplevelAction::Fullscreen => h.set_fullscreen(None),
+                ToplevelAction::UnFullscreen => h.unset_fullscreen(),
+                ToplevelAction::Close => h.close(),
+            }
+            Ok(())
+        }
+        ToplevelHandle::Treeland(h) => {
+            match action {
+                ToplevelAction::Maximize => h.set_maximized(),
+                ToplevelAction::UnMaximize => h.unset_maximized(),
+                ToplevelAction::Minimize => h.set_minimized(),
+                ToplevelAction::UnMinimize => h.unset_minimized(),
+                ToplevelAction::Activate => {
+                    // treeland activate requires a seat
+                    return Err(
+                        "Activate requires a seat object (not yet implemented for treeland)"
+                            .to_string(),
+                    );
+                }
+                ToplevelAction::Fullscreen => h.set_fullscreen(None),
+                ToplevelAction::UnFullscreen => h.unset_fullscreen(),
+                ToplevelAction::Close => h.close(),
+            }
+            Ok(())
+        }
     }
 }
