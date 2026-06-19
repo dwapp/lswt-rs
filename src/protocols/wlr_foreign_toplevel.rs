@@ -21,7 +21,7 @@ static NEXT_TOPLEVEL_ID: AtomicUsize = AtomicUsize::new(0);
 // Dispatch for the foreign toplevel manager
 impl Dispatch<ZwlrForeignToplevelManagerV1, ()> for AppState {
     fn event(
-        state: &mut Self,
+        _state: &mut Self,
         _manager: &ZwlrForeignToplevelManagerV1,
         event: zwlr_foreign_toplevel_manager_v1::Event,
         _: &(),
@@ -31,10 +31,7 @@ impl Dispatch<ZwlrForeignToplevelManagerV1, ()> for AppState {
         match event {
             zwlr_foreign_toplevel_manager_v1::Event::Toplevel { .. } => {
                 // The toplevel handle is created automatically by event_created_child!
-                // We create a new toplevel in our state
-                let id = state.next_toplevel_id();
-                let new_toplevel = Toplevel::new(id);
-                state.add_toplevel(new_toplevel);
+                // It will be created when we receive the first event from the handle.
             }
             zwlr_foreign_toplevel_manager_v1::Event::Finished => {}
             _ => {}
@@ -60,6 +57,12 @@ impl Dispatch<ZwlrForeignToplevelHandleV1, ToplevelHandleData> for AppState {
     ) {
         let toplevel_id = data.id;
         let handle_idx = toplevel_id; // Use toplevel_id as index
+
+        // Ensure the toplevel exists in our list
+        if state.find_toplevel_mut(toplevel_id).is_none() {
+            let new_toplevel = Toplevel::new(toplevel_id);
+            state.add_toplevel(new_toplevel);
+        }
 
         // Save handle if not already saved
         while state.handles.len() <= handle_idx {

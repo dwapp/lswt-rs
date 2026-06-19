@@ -1,5 +1,6 @@
 use serde::Serialize;
 use std::sync::{Arc, Mutex};
+use wayland_client::Connection;
 
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct ToplevelState {
@@ -107,18 +108,20 @@ pub type SharedHandles = Arc<Mutex<Vec<Option<ToplevelHandle>>>>;
 /// Perform an action on a toplevel
 pub fn perform_action(
     handles: &SharedHandles,
+    conn: &Connection,
     toplevel_id: usize,
     action: ToplevelAction,
 ) -> Result<(), String> {
-    let handles = handles.lock().unwrap();
+    let handle = {
+        let handles = handles.lock().unwrap();
+        handles
+            .get(toplevel_id)
+            .and_then(|h| h.as_ref())
+            .cloned()
+            .ok_or_else(|| format!("No handle found for toplevel {}", toplevel_id))?
+    };
 
-    // Find the handle for this toplevel
-    let handle = handles
-        .iter()
-        .find_map(|h| h.as_ref())
-        .ok_or_else(|| format!("No handle found for toplevel {}", toplevel_id))?;
-
-    match handle {
+    match &handle {
         ToplevelHandle::Wlr(h) => {
             match action {
                 ToplevelAction::Maximize => h.set_maximized(),
@@ -158,4 +161,8 @@ pub fn perform_action(
             Ok(())
         }
     }
+    .and_then(|_| {
+        conn.flush()
+            .map_err(|e| format!("Failed to flush Wayland request: {}", e))
+    })
 }

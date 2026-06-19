@@ -10,6 +10,7 @@ use std::sync::{Arc, Mutex};
 pub fn run_repl(args: &Args) -> Result<()> {
     // Create connection and event queue in main thread
     let conn = wayland_client::Connection::connect_to_env()?;
+    let conn_clone = conn.clone();
 
     // Shared state for toplevels and handles
     let shared_toplevels: Arc<Mutex<Vec<Toplevel>>> = Arc::new(Mutex::new(Vec::new()));
@@ -31,7 +32,6 @@ pub fn run_repl(args: &Args) -> Result<()> {
             used_protocol: UsedProtocol::None,
             force_protocol,
             mode,
-            next_id: 0,
             conn: conn.clone(),
             output_names: std::collections::HashMap::new(),
             handles: Vec::new(),
@@ -158,6 +158,7 @@ pub fn run_repl(args: &Args) -> Result<()> {
                                 handle_action(
                                     &shared_toplevels,
                                     &shared_handles,
+                                    &conn_clone,
                                     &parts[1..],
                                     ToplevelAction::Maximize,
                                 );
@@ -166,6 +167,7 @@ pub fn run_repl(args: &Args) -> Result<()> {
                                 handle_action(
                                     &shared_toplevels,
                                     &shared_handles,
+                                    &conn_clone,
                                     &parts[1..],
                                     ToplevelAction::UnMaximize,
                                 );
@@ -174,6 +176,7 @@ pub fn run_repl(args: &Args) -> Result<()> {
                                 handle_action(
                                     &shared_toplevels,
                                     &shared_handles,
+                                    &conn_clone,
                                     &parts[1..],
                                     ToplevelAction::Minimize,
                                 );
@@ -182,6 +185,7 @@ pub fn run_repl(args: &Args) -> Result<()> {
                                 handle_action(
                                     &shared_toplevels,
                                     &shared_handles,
+                                    &conn_clone,
                                     &parts[1..],
                                     ToplevelAction::UnMinimize,
                                 );
@@ -190,6 +194,7 @@ pub fn run_repl(args: &Args) -> Result<()> {
                                 handle_action(
                                     &shared_toplevels,
                                     &shared_handles,
+                                    &conn_clone,
                                     &parts[1..],
                                     ToplevelAction::Activate,
                                 );
@@ -198,6 +203,7 @@ pub fn run_repl(args: &Args) -> Result<()> {
                                 handle_action(
                                     &shared_toplevels,
                                     &shared_handles,
+                                    &conn_clone,
                                     &parts[1..],
                                     ToplevelAction::Fullscreen,
                                 );
@@ -206,6 +212,7 @@ pub fn run_repl(args: &Args) -> Result<()> {
                                 handle_action(
                                     &shared_toplevels,
                                     &shared_handles,
+                                    &conn_clone,
                                     &parts[1..],
                                     ToplevelAction::UnFullscreen,
                                 );
@@ -214,6 +221,7 @@ pub fn run_repl(args: &Args) -> Result<()> {
                                 handle_action(
                                     &shared_toplevels,
                                     &shared_handles,
+                                    &conn_clone,
                                     &parts[1..],
                                     ToplevelAction::Close,
                                 );
@@ -252,6 +260,7 @@ pub fn run_repl(args: &Args) -> Result<()> {
 fn handle_action(
     toplevels: &Arc<Mutex<Vec<Toplevel>>>,
     handles: &SharedHandles,
+    conn: &wayland_client::Connection,
     args: &[&str],
     action: ToplevelAction,
 ) {
@@ -284,7 +293,7 @@ fn handle_action(
                 ToplevelAction::Close => "close",
             };
 
-            match perform_action(handles, t.id, action) {
+            match perform_action(handles, conn, t.id, action) {
                 Ok(_) => println!("{} toplevel #{} ({})", action_name, t.id, t.title_str()),
                 Err(e) => eprintln!("Failed to {}: {}", action_name, e),
             }

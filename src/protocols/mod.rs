@@ -26,7 +26,6 @@ pub struct AppState {
     pub used_protocol: UsedProtocol,
     pub force_protocol: Option<String>,
     pub mode: Mode,
-    pub next_id: usize,
     pub conn: Connection,
     pub output_names: HashMap<u32, String>, // wl_output name -> output name
     pub handles: Vec<Option<ToplevelHandle>>,
@@ -41,7 +40,6 @@ impl AppState {
             used_protocol: UsedProtocol::None,
             force_protocol: args.force_protocol.clone(),
             mode: args.mode,
-            next_id: 0,
             conn,
             output_names: HashMap::new(),
             handles: Vec::new(),
@@ -79,12 +77,6 @@ impl AppState {
         Ok(())
     }
 
-    pub fn next_toplevel_id(&mut self) -> usize {
-        let id = self.next_id;
-        self.next_id += 1;
-        id
-    }
-
     pub fn add_toplevel(&mut self, toplevel: Toplevel) {
         if self.mode == Mode::Watch || self.mode == Mode::VerboseWatch {
             println!("toplevel {}: created", toplevel.id);
@@ -98,6 +90,12 @@ impl AppState {
 
     pub fn remove_toplevel(&mut self, id: usize) {
         if let Some(pos) = self.toplevels.iter().position(|t| t.id == id) {
+            if let Some(handle_id) = self.toplevels[pos].handle_id {
+                if let Some(handle) = self.handles.get_mut(handle_id) {
+                    *handle = None;
+                }
+            }
+
             if self.mode == Mode::Watch || self.mode == Mode::VerboseWatch {
                 println!("toplevel {}: destroyed", id);
             }
