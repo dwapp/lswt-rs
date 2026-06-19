@@ -1,6 +1,6 @@
 use crate::cli::Mode;
-use crate::protocols::AppState;
 use crate::protocols::common::{parse_state_array, print_state_change};
+use crate::protocols::AppState;
 use crate::toplevel::Toplevel;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use wayland_client::{Connection, Dispatch, QueueHandle};

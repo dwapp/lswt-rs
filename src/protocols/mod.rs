@@ -154,7 +154,8 @@ impl Dispatch<wl_registry::WlRegistry, ()> for AppState {
                 }
                 "ext_foreign_toplevel_list_v1"
                     if (state.force_protocol.is_none()
-                        || state.force_protocol.as_deref() == Some("ext-foreign-toplevel-list-v1"))
+                        || state.force_protocol.as_deref()
+                            == Some("ext-foreign-toplevel-list-v1"))
                         && state.used_protocol == UsedProtocol::None =>
                 {
                     // TODO: Bind ext-foreign-toplevel-list-v1 when available
