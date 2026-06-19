@@ -196,14 +196,16 @@ impl Dispatch<wl_registry::WlRegistry, ()> for AppState {
 impl Dispatch<wl_output::WlOutput, u32> for AppState {
     fn event(
         state: &mut Self,
-        _output: &wl_output::WlOutput,
+        output: &wl_output::WlOutput,
         event: wl_output::Event,
-        data: &u32,
+        _data: &u32,
         _: &Connection,
         _: &QueueHandle<Self>,
     ) {
         if let wl_output::Event::Name { name } = event {
-            state.output_names.insert(*data, name);
+            // Use protocol_id() as key to match with OutputEnter/OutputLeave events
+            let output_id = wayland_client::Proxy::id(output).protocol_id();
+            state.output_names.insert(output_id, name);
         }
     }
 }
