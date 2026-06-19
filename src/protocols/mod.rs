@@ -1,4 +1,6 @@
+pub mod common;
 pub mod ext_foreign_toplevel;
+pub mod treeland_foreign_toplevel;
 pub mod wlr_foreign_toplevel;
 
 use crate::cli::{Args, Mode};
@@ -11,6 +13,7 @@ pub enum UsedProtocol {
     None,
     WlrForeignToplevel,
     ExtForeignToplevel,
+    TreelandForeignToplevel,
 }
 
 pub struct AppState {
@@ -49,10 +52,8 @@ impl AppState {
 
         // Check if we found a supported protocol
         if !self.has_protocol() {
-            eprintln!("ERROR: Wayland server supports none of the protocol extensions required for getting toplevel information:");
-            eprintln!("    -> zwlr-foreign-toplevel-management-unstable-v1, version 3 or higher");
-            eprintln!("    -> ext-foreign-toplevel-list-v1, version 1 or higher");
-            std::process::exit(1);
+            anyhow::bail!(
+                "Wayland server supports none of the protocol extensions required for getting toplevel information:\n");
         }
 
         // Second roundtrip to get toplevel data
@@ -99,12 +100,16 @@ impl AppState {
         self.used_protocol != UsedProtocol::None
     }
 
+    #[allow(dead_code)]
     pub fn supports_identifier(&self) -> bool {
         self.used_protocol == UsedProtocol::ExtForeignToplevel
+            || self.used_protocol == UsedProtocol::TreelandForeignToplevel
     }
 
+    #[allow(dead_code)]
     pub fn supports_state(&self) -> bool {
         self.used_protocol == UsedProtocol::WlrForeignToplevel
+            || self.used_protocol == UsedProtocol::TreelandForeignToplevel
     }
 }
 
@@ -125,27 +130,34 @@ impl Dispatch<wl_registry::WlRegistry, ()> for AppState {
         } = event
         {
             match interface.as_str() {
-                "zwlr_foreign_toplevel_manager_v1" if version >= 3 => {
-                    if state.force_protocol.is_none()
-                        || state.force_protocol.as_deref()
-                            == Some("zwlr-foreign-toplevel-management-unstable-v1")
-                    {
-                        if state.used_protocol == UsedProtocol::None {
-                            use wayland_protocols_wlr::foreign_toplevel::v1::client::zwlr_foreign_toplevel_manager_v1::ZwlrForeignToplevelManagerV1;
-                            let _manager: ZwlrForeignToplevelManagerV1 =
-                                registry.bind(name, 3, qh, ());
-                            state.used_protocol = UsedProtocol::WlrForeignToplevel;
-                        }
-                    }
+                "zwlr_foreign_toplevel_manager_v1"
+                    if version >= 3
+                        && (state.force_protocol.is_none()
+                            || state.force_protocol.as_deref()
+                                == Some("zwlr-foreign-toplevel-management-unstable-v1"))
+                        && state.used_protocol == UsedProtocol::None =>
+                {
+                    use wayland_protocols_wlr::foreign_toplevel::v1::client::zwlr_foreign_toplevel_manager_v1::ZwlrForeignToplevelManagerV1;
+                    let _manager: ZwlrForeignToplevelManagerV1 = registry.bind(name, 3, qh, ());
+                    state.used_protocol = UsedProtocol::WlrForeignToplevel;
                 }
-                "ext_foreign_toplevel_list_v1" => {
-                    if state.force_protocol.is_none()
-                        || state.force_protocol.as_deref() == Some("ext-foreign-toplevel-list-v1")
-                    {
-                        if state.used_protocol == UsedProtocol::None {
-                            // TODO: Bind ext-foreign-toplevel-list-v1 when available
-                        }
-                    }
+                "treeland_foreign_toplevel_manager_v1"
+                    if (state.force_protocol.is_none()
+                        || state.force_protocol.as_deref()
+                            == Some("treeland-foreign-toplevel-manager-v1"))
+                        && state.used_protocol == UsedProtocol::None =>
+                {
+                    use wayland_protocols_treeland::foreign_toplevel_manager::v1::client::treeland_foreign_toplevel_manager_v1::TreelandForeignToplevelManagerV1;
+                    let _manager: TreelandForeignToplevelManagerV1 =
+                        registry.bind(name, version.min(2), qh, ());
+                    state.used_protocol = UsedProtocol::TreelandForeignToplevel;
+                }
+                "ext_foreign_toplevel_list_v1"
+                    if (state.force_protocol.is_none()
+                        || state.force_protocol.as_deref() == Some("ext-foreign-toplevel-list-v1"))
+                        && state.used_protocol == UsedProtocol::None =>
+                {
+                    // TODO: Bind ext-foreign-toplevel-list-v1 when available
                 }
                 _ => {}
             }

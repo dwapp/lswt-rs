@@ -26,14 +26,14 @@ impl OutputWriter {
     }
 
     fn write_normal(&self, toplevels: &[Toplevel], protocol: UsedProtocol) -> Result<()> {
-        let supports_state = protocol == UsedProtocol::WlrForeignToplevel;
+        let supports_state = protocol == UsedProtocol::WlrForeignToplevel
+            || protocol == UsedProtocol::TreelandForeignToplevel;
         let max_app_id_len = toplevels
             .iter()
             .map(|t| self.display_len(t.app_id_str()))
             .max()
             .unwrap_or(7)
-            .min(40)
-            .max(7); // At least "app-id:" length
+            .clamp(7, 40); // At least "app-id:" length, max 40
 
         // Header
         if is_terminal() {
@@ -51,7 +51,7 @@ impl OutputWriter {
         // Toplevels
         for toplevel in toplevels {
             if supports_state {
-                self.write_state(&toplevel);
+                self.write_state(toplevel);
                 print!("     ");
             }
             let app_id = self.format_string(toplevel.app_id_str());
@@ -63,8 +63,10 @@ impl OutputWriter {
     }
 
     fn write_json(&self, toplevels: &[Toplevel], protocol: UsedProtocol) -> Result<()> {
-        let supports_identifier = protocol == UsedProtocol::ExtForeignToplevel;
-        let supports_state = protocol == UsedProtocol::WlrForeignToplevel;
+        let supports_identifier = protocol == UsedProtocol::ExtForeignToplevel
+            || protocol == UsedProtocol::TreelandForeignToplevel;
+        let supports_state = protocol == UsedProtocol::WlrForeignToplevel
+            || protocol == UsedProtocol::TreelandForeignToplevel;
 
         let mut output = json!({
             "json-output-version": 2,
@@ -108,8 +110,10 @@ impl OutputWriter {
 
     fn write_custom(&self, toplevels: &[Toplevel], protocol: UsedProtocol) -> Result<()> {
         let format = self.custom_format.as_ref().unwrap();
-        let supports_identifier = protocol == UsedProtocol::ExtForeignToplevel;
-        let supports_state = protocol == UsedProtocol::WlrForeignToplevel;
+        let supports_identifier = protocol == UsedProtocol::ExtForeignToplevel
+            || protocol == UsedProtocol::TreelandForeignToplevel;
+        let supports_state = protocol == UsedProtocol::WlrForeignToplevel
+            || protocol == UsedProtocol::TreelandForeignToplevel;
 
         for toplevel in toplevels {
             let mut first = true;

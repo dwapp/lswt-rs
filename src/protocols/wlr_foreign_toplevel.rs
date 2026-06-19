@@ -1,6 +1,8 @@
 use crate::cli::Mode;
 use crate::protocols::AppState;
-use crate::toplevel::{Toplevel, ToplevelState};
+use crate::protocols::common::{parse_state_array, print_state_change};
+use crate::toplevel::Toplevel;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use wayland_client::{Connection, Dispatch, QueueHandle};
 use wayland_protocols_wlr::foreign_toplevel::v1::client::{
     zwlr_foreign_toplevel_handle_v1::{self, ZwlrForeignToplevelHandleV1},
@@ -8,9 +10,13 @@ use wayland_protocols_wlr::foreign_toplevel::v1::client::{
 };
 
 // User data for toplevel handles
+#[derive(Debug)]
 pub struct ToplevelHandleData {
     pub id: usize,
 }
+
+// Global counter for generating toplevel IDs
+static NEXT_TOPLEVEL_ID: AtomicUsize = AtomicUsize::new(0);
 
 // Dispatch for the foreign toplevel manager
 impl Dispatch<ZwlrForeignToplevelManagerV1, ()> for AppState {
@@ -23,18 +29,23 @@ impl Dispatch<ZwlrForeignToplevelManagerV1, ()> for AppState {
         _qh: &QueueHandle<Self>,
     ) {
         match event {
-            zwlr_foreign_toplevel_manager_v1::Event::Toplevel { toplevel: _ } => {
+            zwlr_foreign_toplevel_manager_v1::Event::Toplevel { .. } => {
+                // The toplevel handle is created automatically by event_created_child!
+                // We create a new toplevel in our state
                 let id = state.next_toplevel_id();
                 let new_toplevel = Toplevel::new(id);
                 state.add_toplevel(new_toplevel);
-
-                // Note: The toplevel handle will dispatch its own events
-                // We store the ID in user data for the handle
             }
             zwlr_foreign_toplevel_manager_v1::Event::Finished => {}
             _ => {}
         }
     }
+
+    wayland_client::event_created_child!(AppState, ZwlrForeignToplevelManagerV1, [
+        zwlr_foreign_toplevel_manager_v1::EVT_TOPLEVEL_OPCODE => (ZwlrForeignToplevelHandleV1, ToplevelHandleData {
+            id: NEXT_TOPLEVEL_ID.fetch_add(1, Ordering::SeqCst)
+        })
+    ]);
 }
 
 // Dispatch for individual toplevel handles
@@ -84,41 +95,8 @@ impl Dispatch<ZwlrForeignToplevelHandleV1, ToplevelHandleData> for AppState {
             }
             zwlr_foreign_toplevel_handle_v1::Event::State { state: state_array } => {
                 let mode = state.mode;
-                let mut new_state = ToplevelState::default();
-
-                // Parse state array
-                for chunk in state_array.chunks(4) {
-                    if chunk.len() == 4 {
-                        let state_val =
-                            u32::from_ne_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
-                        match state_val {
-                            0 => new_state.maximized = true,  // MAXIMIZED
-                            1 => new_state.minimized = true,  // MINIMIZED
-                            2 => new_state.activated = true,  // ACTIVATED
-                            3 => new_state.fullscreen = true, // FULLSCREEN
-                            _ => {}
-                        }
-                    }
-                }
-
-                if mode == Mode::VerboseWatch {
-                    println!(
-                        "toplevel {}: fullscreen: {}",
-                        toplevel_id, new_state.fullscreen
-                    );
-                    println!(
-                        "toplevel {}: activated (focused): {}",
-                        toplevel_id, new_state.activated
-                    );
-                    println!(
-                        "toplevel {}: maximized: {}",
-                        toplevel_id, new_state.maximized
-                    );
-                    println!(
-                        "toplevel {}: minimized: {}",
-                        toplevel_id, new_state.minimized
-                    );
-                }
+                let new_state = parse_state_array(&state_array);
+                print_state_change(toplevel_id, &new_state, mode);
 
                 if let Some(toplevel) = state.find_toplevel_mut(toplevel_id) {
                     toplevel.set_state(new_state);
