@@ -23,7 +23,7 @@ fn main() -> Result<()> {
             writer.write_toplevels(&app.toplevels, app.used_protocol)?;
         }
         Mode::Repl => {
-            repl::run_repl(&mut app)?;
+            repl::run_repl(&args)?;
         }
         _ => {}
     }

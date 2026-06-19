@@ -1,70 +1,87 @@
-use crate::cli::OutputFormat;
+use crate::cli::{Args, OutputFormat};
 use crate::output::OutputWriter;
-use crate::protocols::AppState;
+use crate::protocols::{AppState, UsedProtocol};
 use crate::toplevel::Toplevel;
 use anyhow::Result;
 use rustyline::error::ReadlineError;
 use rustyline::DefaultEditor;
 use std::sync::{Arc, Mutex};
 
-pub fn run_repl(app: &mut AppState) -> Result<()> {
-    // Get the connection and create event queue
-    let conn = app.conn.clone();
-    let mut event_queue = conn.new_event_queue();
-    let qh = event_queue.handle();
+pub fn run_repl(args: &Args) -> Result<()> {
+    // Create connection and event queue in main thread
+    let conn = wayland_client::Connection::connect_to_env()?;
 
-    // Get registry and bind protocols
-    let display = conn.display();
-    display.get_registry(&qh, ());
-
-    // First roundtrip to get globals
-    event_queue.roundtrip(app)?;
-
-    if !app.has_protocol() {
-        anyhow::bail!(
-            "Wayland server supports none of the protocol extensions required for getting toplevel information"
-        );
-    }
-
-    // Second roundtrip to get toplevel data
-    event_queue.roundtrip(app)?;
-
-    // Get initial state
-    let used_protocol = app.used_protocol;
-    let shared_toplevels = Arc::new(Mutex::new(app.toplevels.clone()));
+    // Shared state for toplevels
+    let shared_toplevels: Arc<Mutex<Vec<Toplevel>>> = Arc::new(Mutex::new(Vec::new()));
+    let shared_protocol: Arc<Mutex<UsedProtocol>> = Arc::new(Mutex::new(UsedProtocol::None));
     let toplevels_for_thread = shared_toplevels.clone();
+    let protocol_for_thread = shared_protocol.clone();
 
-    // Clone everything we need for the background thread
-    let force_protocol = app.force_protocol.clone();
-    let mode = app.mode;
-    let next_id = app.next_id;
-    let output_names = app.output_names.clone();
-    let initial_toplevels = app.toplevels.clone();
+    // Clone args for the background thread
+    let force_protocol = args.force_protocol.clone();
+    let mode = args.mode;
 
-    // Move the event queue and app state into background thread
+    // Spawn background thread for event processing
     let _event_thread = std::thread::spawn(move || {
-        let mut app_state = AppState {
-            toplevels: initial_toplevels,
-            used_protocol,
+        // Create AppState in the background thread
+        let mut app = AppState {
+            toplevels: Vec::new(),
+            used_protocol: UsedProtocol::None,
             force_protocol,
             mode,
-            next_id,
-            conn,
-            output_names,
+            next_id: 0,
+            conn: conn.clone(),
+            output_names: std::collections::HashMap::new(),
         };
 
+        // Initialize: bind protocols and get initial state
+        let mut event_queue = conn.new_event_queue();
+        let qh = event_queue.handle();
+
+        // Get registry
+        let display = conn.display();
+        display.get_registry(&qh, ());
+
+        // First roundtrip to get globals
+        if let Err(e) = event_queue.roundtrip(&mut app) {
+            eprintln!("Error during initialization: {}", e);
+            return;
+        }
+
+        if !app.has_protocol() {
+            eprintln!("No supported protocol found");
+            return;
+        }
+
+        // Second roundtrip to get initial toplevel data
+        if let Err(e) = event_queue.roundtrip(&mut app) {
+            eprintln!("Error getting initial data: {}", e);
+            return;
+        }
+
+        // Update shared state with initial data
+        {
+            let mut toplevels = toplevels_for_thread.lock().unwrap();
+            *toplevels = app.toplevels.clone();
+            let mut protocol = protocol_for_thread.lock().unwrap();
+            *protocol = app.used_protocol;
+        }
+
+        // Event loop - process events continuously
         loop {
-            // Blocking dispatch - waits for events
-            if let Err(e) = event_queue.blocking_dispatch(&mut app_state) {
+            if let Err(e) = event_queue.blocking_dispatch(&mut app) {
                 eprintln!("Event dispatch error: {}", e);
                 break;
             }
 
             // Update shared state
             let mut toplevels = toplevels_for_thread.lock().unwrap();
-            *toplevels = app_state.toplevels.clone();
+            *toplevels = app.toplevels.clone();
         }
     });
+
+    // Wait a bit for initialization
+    std::thread::sleep(std::time::Duration::from_millis(100));
 
     // Run REPL in main thread
     let mut rl = DefaultEditor::new()?;
@@ -89,13 +106,15 @@ pub fn run_repl(app: &mut AppState) -> Result<()> {
                 match line {
                     "list" | "ls" => {
                         let toplevels = shared_toplevels.lock().unwrap();
+                        let protocol = shared_protocol.lock().unwrap();
                         let writer = OutputWriter::new(&OutputFormat::Normal, &None);
-                        writer.write_toplevels(&toplevels, used_protocol)?;
+                        writer.write_toplevels(&toplevels, *protocol)?;
                     }
                     "list-json" | "lj" => {
                         let toplevels = shared_toplevels.lock().unwrap();
+                        let protocol = shared_protocol.lock().unwrap();
                         let writer = OutputWriter::new(&OutputFormat::Json, &None);
-                        writer.write_toplevels(&toplevels, used_protocol)?;
+                        writer.write_toplevels(&toplevels, *protocol)?;
                     }
                     "help" | "h" => {
                         print_help();
@@ -124,7 +143,8 @@ pub fn run_repl(app: &mut AppState) -> Result<()> {
                                 println!("Toplevels: {}", toplevels.len());
                             }
                             Some("protocol") => {
-                                println!("Protocol: {:?}", used_protocol);
+                                let protocol = shared_protocol.lock().unwrap();
+                                println!("Protocol: {:?}", *protocol);
                             }
                             _ => {
                                 eprintln!(
