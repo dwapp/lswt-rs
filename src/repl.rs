@@ -6,6 +6,7 @@ use anyhow::Result;
 use rustyline::error::ReadlineError;
 use rustyline::DefaultEditor;
 use std::sync::{Arc, Mutex};
+use wayland_client::protocol::wl_seat;
 
 pub fn run_repl(args: &Args) -> Result<()> {
     // Create connection and event queue in main thread
@@ -16,9 +17,11 @@ pub fn run_repl(args: &Args) -> Result<()> {
     let shared_toplevels: Arc<Mutex<Vec<Toplevel>>> = Arc::new(Mutex::new(Vec::new()));
     let shared_handles: SharedHandles = Arc::new(Mutex::new(Vec::new()));
     let shared_protocol: Arc<Mutex<UsedProtocol>> = Arc::new(Mutex::new(UsedProtocol::None));
+    let shared_seat: Arc<Mutex<Option<wl_seat::WlSeat>>> = Arc::new(Mutex::new(None));
     let toplevels_for_thread = shared_toplevels.clone();
     let handles_for_thread = shared_handles.clone();
     let protocol_for_thread = shared_protocol.clone();
+    let seat_for_thread = shared_seat.clone();
 
     // Clone args for the background thread
     let force_protocol = args.force_protocol.clone();
@@ -35,6 +38,7 @@ pub fn run_repl(args: &Args) -> Result<()> {
             conn: conn.clone(),
             output_names: std::collections::HashMap::new(),
             handles: Vec::new(),
+            seat: None,
         };
 
         // Initialize: bind protocols and get initial state
@@ -70,6 +74,8 @@ pub fn run_repl(args: &Args) -> Result<()> {
             *handles = app.handles.clone();
             let mut protocol = protocol_for_thread.lock().unwrap();
             *protocol = app.used_protocol;
+            let mut seat = seat_for_thread.lock().unwrap();
+            *seat = app.seat.clone();
         }
 
         // Event loop - process events continuously
@@ -84,6 +90,8 @@ pub fn run_repl(args: &Args) -> Result<()> {
             *toplevels = app.toplevels.clone();
             let mut handles = handles_for_thread.lock().unwrap();
             *handles = app.handles.clone();
+            let mut seat = seat_for_thread.lock().unwrap();
+            *seat = app.seat.clone();
         }
     });
 
@@ -159,6 +167,7 @@ pub fn run_repl(args: &Args) -> Result<()> {
                                     &shared_toplevels,
                                     &shared_handles,
                                     &conn_clone,
+                                    &shared_seat,
                                     &parts[1..],
                                     ToplevelAction::Maximize,
                                 );
@@ -168,6 +177,7 @@ pub fn run_repl(args: &Args) -> Result<()> {
                                     &shared_toplevels,
                                     &shared_handles,
                                     &conn_clone,
+                                    &shared_seat,
                                     &parts[1..],
                                     ToplevelAction::UnMaximize,
                                 );
@@ -177,6 +187,7 @@ pub fn run_repl(args: &Args) -> Result<()> {
                                     &shared_toplevels,
                                     &shared_handles,
                                     &conn_clone,
+                                    &shared_seat,
                                     &parts[1..],
                                     ToplevelAction::Minimize,
                                 );
@@ -186,6 +197,7 @@ pub fn run_repl(args: &Args) -> Result<()> {
                                     &shared_toplevels,
                                     &shared_handles,
                                     &conn_clone,
+                                    &shared_seat,
                                     &parts[1..],
                                     ToplevelAction::UnMinimize,
                                 );
@@ -195,6 +207,7 @@ pub fn run_repl(args: &Args) -> Result<()> {
                                     &shared_toplevels,
                                     &shared_handles,
                                     &conn_clone,
+                                    &shared_seat,
                                     &parts[1..],
                                     ToplevelAction::Activate,
                                 );
@@ -204,6 +217,7 @@ pub fn run_repl(args: &Args) -> Result<()> {
                                     &shared_toplevels,
                                     &shared_handles,
                                     &conn_clone,
+                                    &shared_seat,
                                     &parts[1..],
                                     ToplevelAction::Fullscreen,
                                 );
@@ -213,6 +227,7 @@ pub fn run_repl(args: &Args) -> Result<()> {
                                     &shared_toplevels,
                                     &shared_handles,
                                     &conn_clone,
+                                    &shared_seat,
                                     &parts[1..],
                                     ToplevelAction::UnFullscreen,
                                 );
@@ -222,6 +237,7 @@ pub fn run_repl(args: &Args) -> Result<()> {
                                     &shared_toplevels,
                                     &shared_handles,
                                     &conn_clone,
+                                    &shared_seat,
                                     &parts[1..],
                                     ToplevelAction::Close,
                                 );
@@ -261,6 +277,7 @@ fn handle_action(
     toplevels: &Arc<Mutex<Vec<Toplevel>>>,
     handles: &SharedHandles,
     conn: &wayland_client::Connection,
+    seat: &Arc<Mutex<Option<wl_seat::WlSeat>>>,
     args: &[&str],
     action: ToplevelAction,
 ) {
@@ -293,7 +310,8 @@ fn handle_action(
                 ToplevelAction::Close => "close",
             };
 
-            match perform_action(handles, conn, t.id, action) {
+            let seat_guard = seat.lock().unwrap();
+            match perform_action(handles, conn, seat_guard.as_ref(), t.id, action) {
                 Ok(_) => println!("{} toplevel #{} ({})", action_name, t.id, t.title_str()),
                 Err(e) => eprintln!("Failed to {}: {}", action_name, e),
             }

@@ -9,7 +9,7 @@ use anyhow::Result;
 use std::collections::HashMap;
 
 use wayland_client::{
-    protocol::{wl_output, wl_registry},
+    protocol::{wl_output, wl_registry, wl_seat},
     Connection, Dispatch, QueueHandle,
 };
 
@@ -29,6 +29,7 @@ pub struct AppState {
     pub conn: Connection,
     pub output_names: HashMap<u32, String>, // wl_output name -> output name
     pub handles: Vec<Option<ToplevelHandle>>,
+    pub seat: Option<wl_seat::WlSeat>,
 }
 
 impl AppState {
@@ -43,6 +44,7 @@ impl AppState {
             conn,
             output_names: HashMap::new(),
             handles: Vec::new(),
+            seat: None,
         })
     }
 
@@ -184,11 +186,28 @@ impl Dispatch<wl_registry::WlRegistry, ()> for AppState {
                 }
                 "wl_output" => {
                     // Bind wl_output version 4 to get Name event
-                    let _output: wl_output::WlOutput = registry.bind(name, version.min(4), qh, name);
+                    let _output: wl_output::WlOutput =
+                        registry.bind(name, version.min(4), qh, name);
+                }
+                "wl_seat" if state.seat.is_none() => {
+                    let seat: wl_seat::WlSeat = registry.bind(name, version.min(1), qh, ());
+                    state.seat = Some(seat);
                 }
                 _ => {}
             }
         }
+    }
+}
+
+impl Dispatch<wl_seat::WlSeat, ()> for AppState {
+    fn event(
+        _state: &mut Self,
+        _seat: &wl_seat::WlSeat,
+        _event: wl_seat::Event,
+        _: &(),
+        _: &Connection,
+        _: &QueueHandle<Self>,
+    ) {
     }
 }
 

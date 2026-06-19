@@ -1,6 +1,6 @@
 use serde::Serialize;
 use std::sync::{Arc, Mutex};
-use wayland_client::Connection;
+use wayland_client::{protocol::wl_seat, Connection};
 
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct ToplevelState {
@@ -41,7 +41,6 @@ pub struct Toplevel {
     #[serde(skip)]
     pub listed: bool,
     #[serde(skip)]
-    #[allow(dead_code)]
     pub handle_id: Option<usize>, // Index into handles vec
 }
 
@@ -109,6 +108,7 @@ pub type SharedHandles = Arc<Mutex<Vec<Option<ToplevelHandle>>>>;
 pub fn perform_action(
     handles: &SharedHandles,
     conn: &Connection,
+    seat: Option<&wl_seat::WlSeat>,
     toplevel_id: usize,
     action: ToplevelAction,
 ) -> Result<(), String> {
@@ -129,11 +129,8 @@ pub fn perform_action(
                 ToplevelAction::Minimize => h.set_minimized(),
                 ToplevelAction::UnMinimize => h.unset_minimized(),
                 ToplevelAction::Activate => {
-                    // wlr activate requires a seat, we'll use a workaround
-                    // For now, just log that it's not fully supported
-                    return Err(
-                        "Activate requires a seat object (not yet implemented for wlr)".to_string(),
-                    );
+                    let seat = seat.ok_or_else(|| "No wl_seat found for activate".to_string())?;
+                    h.activate(seat);
                 }
                 ToplevelAction::Fullscreen => h.set_fullscreen(None),
                 ToplevelAction::UnFullscreen => h.unset_fullscreen(),
@@ -148,11 +145,8 @@ pub fn perform_action(
                 ToplevelAction::Minimize => h.set_minimized(),
                 ToplevelAction::UnMinimize => h.unset_minimized(),
                 ToplevelAction::Activate => {
-                    // treeland activate requires a seat
-                    return Err(
-                        "Activate requires a seat object (not yet implemented for treeland)"
-                            .to_string(),
-                    );
+                    let seat = seat.ok_or_else(|| "No wl_seat found for activate".to_string())?;
+                    h.activate(seat);
                 }
                 ToplevelAction::Fullscreen => h.set_fullscreen(None),
                 ToplevelAction::UnFullscreen => h.unset_fullscreen(),
