@@ -52,9 +52,13 @@ lswt --verbose-watch
 # Custom output format (title,app-id,activated)
 lswt --custom taA
 
-# Force specific protocol
+# Force specific protocol (short names supported)
+lswt --force-protocol wlr        # wlroots protocol
+lswt --force-protocol treeland   # Deepin/Treeland protocol
+lswt --force-protocol ext        # Standard ext-foreign-toplevel-list protocol
+
+# Full protocol names also work
 lswt --force-protocol zwlr-foreign-toplevel-management-unstable-v1
-lswt --force-protocol treeland-foreign-toplevel-manager-v1
 ```
 
 ### Options
@@ -65,7 +69,7 @@ lswt --force-protocol treeland-foreign-toplevel-manager-v1
 - `-w, --watch` - Run continuously and log title, identifier and app-id events
 - `-W, --verbose-watch` - Like --watch, but also log activated, fullscreen, minimized and maximized state
 - `-c <fmt>, --custom <fmt>` - Define a custom line-based output format
-- `--force-protocol <name>` - Use specified protocol, do not fall back onto others
+- `--force-protocol <name>` - Use specified protocol (short names: `wlr`, `treeland`, `ext`)
 
 ### Custom Format Fields
 

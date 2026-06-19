@@ -100,6 +100,24 @@ impl AppState {
         self.used_protocol != UsedProtocol::None
     }
 
+    /// Check if force_protocol matches a specific protocol (supports short names)
+    pub fn force_protocol_matches(&self, protocol: &str) -> bool {
+        match &self.force_protocol {
+            Some(fp) => {
+                let fp_lower = fp.to_lowercase();
+                match fp_lower.as_str() {
+                    // Short names
+                    "wlr" => protocol == "zwlr-foreign-toplevel-management-unstable-v1",
+                    "treeland" => protocol == "treeland-foreign-toplevel-manager-v1",
+                    "ext" => protocol == "ext-foreign-toplevel-list-v1",
+                    // Full names (case-insensitive)
+                    _ => fp_lower == protocol.to_lowercase(),
+                }
+            }
+            None => true, // No force_protocol means accept any
+        }
+    }
+
     #[allow(dead_code)]
     pub fn supports_identifier(&self) -> bool {
         self.used_protocol == UsedProtocol::ExtForeignToplevel
@@ -132,9 +150,9 @@ impl Dispatch<wl_registry::WlRegistry, ()> for AppState {
             match interface.as_str() {
                 "zwlr_foreign_toplevel_manager_v1"
                     if version >= 3
-                        && (state.force_protocol.is_none()
-                            || state.force_protocol.as_deref()
-                                == Some("zwlr-foreign-toplevel-management-unstable-v1"))
+                        && state.force_protocol_matches(
+                            "zwlr-foreign-toplevel-management-unstable-v1",
+                        )
                         && state.used_protocol == UsedProtocol::None =>
                 {
                     use wayland_protocols_wlr::foreign_toplevel::v1::client::zwlr_foreign_toplevel_manager_v1::ZwlrForeignToplevelManagerV1;
@@ -142,9 +160,7 @@ impl Dispatch<wl_registry::WlRegistry, ()> for AppState {
                     state.used_protocol = UsedProtocol::WlrForeignToplevel;
                 }
                 "treeland_foreign_toplevel_manager_v1"
-                    if (state.force_protocol.is_none()
-                        || state.force_protocol.as_deref()
-                            == Some("treeland-foreign-toplevel-manager-v1"))
+                    if state.force_protocol_matches("treeland-foreign-toplevel-manager-v1")
                         && state.used_protocol == UsedProtocol::None =>
                 {
                     use wayland_protocols_treeland::foreign_toplevel_manager::v1::client::treeland_foreign_toplevel_manager_v1::TreelandForeignToplevelManagerV1;
@@ -153,9 +169,7 @@ impl Dispatch<wl_registry::WlRegistry, ()> for AppState {
                     state.used_protocol = UsedProtocol::TreelandForeignToplevel;
                 }
                 "ext_foreign_toplevel_list_v1"
-                    if (state.force_protocol.is_none()
-                        || state.force_protocol.as_deref()
-                            == Some("ext-foreign-toplevel-list-v1"))
+                    if state.force_protocol_matches("ext-foreign-toplevel-list-v1")
                         && state.used_protocol == UsedProtocol::None =>
                 {
                     use wayland_protocols::ext::foreign_toplevel_list::v1::client::ext_foreign_toplevel_list_v1::ExtForeignToplevelListV1;

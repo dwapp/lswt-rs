@@ -38,6 +38,7 @@ pub struct Args {
     pub custom: Option<String>,
 
     /// Use specified protocol, do not fall back onto others
+    /// Supported: wlr, treeland, ext (or full protocol names)
     #[arg(long, value_name = "name")]
     pub force_protocol: Option<String>,
 
