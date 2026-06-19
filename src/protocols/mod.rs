@@ -6,7 +6,11 @@ pub mod wlr_foreign_toplevel;
 use crate::cli::{Args, Mode};
 use crate::toplevel::Toplevel;
 use anyhow::Result;
-use wayland_client::{protocol::wl_registry, Connection, Dispatch, QueueHandle};
+use std::collections::HashMap;
+use wayland_client::{
+    protocol::{wl_output, wl_registry},
+    Connection, Dispatch, QueueHandle,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum UsedProtocol {
@@ -23,6 +27,7 @@ pub struct AppState {
     pub mode: Mode,
     pub next_id: usize,
     pub conn: Connection,
+    pub output_names: HashMap<u32, String>, // wl_output name -> output name
 }
 
 impl AppState {
@@ -36,6 +41,7 @@ impl AppState {
             mode: args.mode,
             next_id: 0,
             conn,
+            output_names: HashMap::new(),
         })
     }
 
@@ -176,8 +182,27 @@ impl Dispatch<wl_registry::WlRegistry, ()> for AppState {
                     let _list: ExtForeignToplevelListV1 = registry.bind(name, 1, qh, ());
                     state.used_protocol = UsedProtocol::ExtForeignToplevel;
                 }
+                "wl_output" => {
+                    let _output: wl_output::WlOutput = registry.bind(name, 1, qh, name);
+                }
                 _ => {}
             }
+        }
+    }
+}
+
+// Implement Dispatch for wl_output to track output names
+impl Dispatch<wl_output::WlOutput, u32> for AppState {
+    fn event(
+        state: &mut Self,
+        _output: &wl_output::WlOutput,
+        event: wl_output::Event,
+        data: &u32,
+        _: &Connection,
+        _: &QueueHandle<Self>,
+    ) {
+        if let wl_output::Event::Name { name } = event {
+            state.output_names.insert(*data, name);
         }
     }
 }

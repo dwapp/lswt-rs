@@ -15,6 +15,7 @@ pub struct Toplevel {
     pub app_id: Option<String>,
     pub identifier: Option<String>,
     pub state: ToplevelState,
+    pub outputs: Vec<String>,
     #[serde(skip)]
     pub listed: bool,
 }
@@ -27,6 +28,7 @@ impl Toplevel {
             app_id: None,
             identifier: None,
             state: ToplevelState::default(),
+            outputs: Vec::new(),
             listed: false,
         }
     }
@@ -49,6 +51,16 @@ impl Toplevel {
 
     pub fn mark_listed(&mut self) {
         self.listed = true;
+    }
+
+    pub fn add_output(&mut self, output: String) {
+        if !self.outputs.contains(&output) {
+            self.outputs.push(output);
+        }
+    }
+
+    pub fn remove_output(&mut self, output: &str) {
+        self.outputs.retain(|o| o != output);
     }
 
     pub fn title_str(&self) -> &str {

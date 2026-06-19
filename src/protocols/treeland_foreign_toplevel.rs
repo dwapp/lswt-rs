@@ -143,11 +143,35 @@ impl Dispatch<TreelandForeignToplevelHandleV1, TreelandToplevelHandleData> for A
             treeland_foreign_toplevel_handle_v1::Event::Closed => {
                 state.remove_toplevel(toplevel_id);
             }
-            treeland_foreign_toplevel_handle_v1::Event::OutputEnter { .. } => {
-                // We don't track which outputs a toplevel is on
+            treeland_foreign_toplevel_handle_v1::Event::OutputEnter { output } => {
+                let mode = state.mode;
+                let output_id = wayland_client::Proxy::id(&output).protocol_id();
+                let output_name = state
+                    .output_names
+                    .get(&output_id)
+                    .cloned()
+                    .unwrap_or_else(|| format!("<unknown-{}>", output_id));
+                if let Some(toplevel) = state.find_toplevel_mut(toplevel_id) {
+                    if mode == Mode::Watch || mode == Mode::VerboseWatch {
+                        println!("toplevel {}: enter output: {}", toplevel_id, output_name);
+                    }
+                    toplevel.add_output(output_name);
+                }
             }
-            treeland_foreign_toplevel_handle_v1::Event::OutputLeave { .. } => {
-                // We don't track which outputs a toplevel is on
+            treeland_foreign_toplevel_handle_v1::Event::OutputLeave { output } => {
+                let mode = state.mode;
+                let output_id = wayland_client::Proxy::id(&output).protocol_id();
+                let output_name = state
+                    .output_names
+                    .get(&output_id)
+                    .cloned()
+                    .unwrap_or_else(|| format!("<unknown-{}>", output_id));
+                if let Some(toplevel) = state.find_toplevel_mut(toplevel_id) {
+                    if mode == Mode::Watch || mode == Mode::VerboseWatch {
+                        println!("toplevel {}: leave output: {}", toplevel_id, output_name);
+                    }
+                    toplevel.remove_output(&output_name);
+                }
             }
             treeland_foreign_toplevel_handle_v1::Event::Parent { .. } => {
                 // We don't track parent relationships
