@@ -56,7 +56,11 @@ impl OutputWriter {
             }
             let app_id = self.format_string(toplevel.app_id_str());
             print!("{:width$}   ", app_id, width = max_app_id_len);
-            println!("{}", self.format_string(toplevel.title_str()));
+            print!("{}", self.format_string(toplevel.title_str()));
+            if !toplevel.outputs.is_empty() {
+                print!("  [{}]", toplevel.outputs.join(", "));
+            }
+            println!();
         }
 
         Ok(())
@@ -99,6 +103,10 @@ impl OutputWriter {
 
             if supports_identifier {
                 t["identifier"] = json!(toplevel.identifier.as_ref());
+            }
+
+            if !toplevel.outputs.is_empty() {
+                t["outputs"] = json!(toplevel.outputs);
             }
 
             toplevels_array.push(t);
