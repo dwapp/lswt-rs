@@ -7,6 +7,7 @@ use crate::cli::{Args, Mode};
 use crate::toplevel::Toplevel;
 use anyhow::Result;
 use std::collections::HashMap;
+
 use wayland_client::{
     protocol::{wl_output, wl_registry},
     Connection, Dispatch, QueueHandle,
