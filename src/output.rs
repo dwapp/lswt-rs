@@ -71,6 +71,7 @@ impl OutputWriter {
             || protocol == UsedProtocol::TreelandForeignToplevel;
         let supports_state = protocol == UsedProtocol::WlrForeignToplevel
             || protocol == UsedProtocol::TreelandForeignToplevel;
+        let supports_output = protocol == UsedProtocol::TreelandForeignToplevel;
 
         let mut output = json!({
             "json-output-version": 2,
@@ -82,6 +83,7 @@ impl OutputWriter {
                 "activated": supports_state,
                 "minimized": supports_state,
                 "maximized": supports_state,
+                "output": supports_output,
             },
             "toplevels": []
         });
