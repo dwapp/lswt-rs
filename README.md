@@ -8,7 +8,7 @@ A Rust implementation of [lswt](https://sr.ht/~leon_plickat/lswt/) - list Waylan
 - Support for multiple Wayland protocols:
   - `zwlr-foreign-toplevel-management-unstable-v1` (wlroots)
   - `treeland-foreign-toplevel-manager-v1` (Deepin/Treeland)
-  - `ext-foreign-toplevel-list-v1` (standardized protocol, when available)
+  - `ext-foreign-toplevel-list-v1` (standardized protocol)
 - Multiple output formats:
   - Normal (human-readable table)
   - JSON (machine-readable)
