@@ -184,7 +184,8 @@ impl Dispatch<wl_registry::WlRegistry, ()> for AppState {
                     state.used_protocol = UsedProtocol::ExtForeignToplevel;
                 }
                 "wl_output" => {
-                    let _output: wl_output::WlOutput = registry.bind(name, 1, qh, name);
+                    // Bind wl_output version 4 to get Name event
+                    let _output: wl_output::WlOutput = registry.bind(name, version.min(4), qh, name);
                 }
                 _ => {}
             }
