@@ -171,8 +171,7 @@ impl Dispatch<wl_registry::WlRegistry, ()> for AppState {
                         && state.used_protocol == UsedProtocol::None =>
                 {
                     use wayland_protocols_treeland::foreign_toplevel_manager::v1::client::treeland_foreign_toplevel_manager_v1::TreelandForeignToplevelManagerV1;
-                    let _manager: TreelandForeignToplevelManagerV1 =
-                        registry.bind(name, version.min(2), qh, ());
+                    let _manager: TreelandForeignToplevelManagerV1 = registry.bind(name, 1, qh, ());
                     state.used_protocol = UsedProtocol::TreelandForeignToplevel;
                 }
                 "ext_foreign_toplevel_list_v1"
