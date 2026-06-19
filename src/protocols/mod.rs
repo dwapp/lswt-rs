@@ -158,7 +158,9 @@ impl Dispatch<wl_registry::WlRegistry, ()> for AppState {
                             == Some("ext-foreign-toplevel-list-v1"))
                         && state.used_protocol == UsedProtocol::None =>
                 {
-                    // TODO: Bind ext-foreign-toplevel-list-v1 when available
+                    use wayland_protocols::ext::foreign_toplevel_list::v1::client::ext_foreign_toplevel_list_v1::ExtForeignToplevelListV1;
+                    let _list: ExtForeignToplevelListV1 = registry.bind(name, 1, qh, ());
+                    state.used_protocol = UsedProtocol::ExtForeignToplevel;
                 }
                 _ => {}
             }
