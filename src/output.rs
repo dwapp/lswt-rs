@@ -39,6 +39,7 @@ impl OutputWriter {
         if is_terminal() {
             print!("\x1b[0;1m"); // Bold
         }
+        print!("id:   ");
         if supports_state {
             print!("state:   ");
         }
@@ -50,6 +51,7 @@ impl OutputWriter {
 
         // Toplevels
         for toplevel in toplevels {
+            print!("{:>3}   ", toplevel.id);
             if supports_state {
                 self.write_state(toplevel);
                 print!("     ");
