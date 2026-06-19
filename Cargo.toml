@@ -20,3 +20,5 @@ wayland-protocols = { version = "0.32", features = ["unstable", "staging", "clie
 wayland-protocols-wlr = { version = "0.3", features = ["client"] }
 wayland-protocols-treeland = { version = "0.1.2", features = ["client"] }
 anyhow = "1.0"
+rustyline = "14"
+dirs-next = "2"

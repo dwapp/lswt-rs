@@ -6,6 +6,7 @@ pub enum Mode {
     List,
     Watch,
     VerboseWatch,
+    Repl,
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -33,6 +34,10 @@ pub struct Args {
     #[arg(short = 'W', long)]
     pub verbose_watch: bool,
 
+    /// Enter interactive REPL mode
+    #[arg(long)]
+    pub repl: bool,
+
     /// Define a custom line-based output format
     #[arg(short, long, value_name = "fmt")]
     pub custom: Option<String>,
@@ -57,7 +62,9 @@ impl Args {
         let mut args = Args::parse();
 
         // Determine mode
-        args.mode = if args.verbose_watch {
+        args.mode = if args.repl {
+            Mode::Repl
+        } else if args.verbose_watch {
             Mode::VerboseWatch
         } else if args.watch {
             Mode::Watch

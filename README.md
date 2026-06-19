@@ -49,6 +49,9 @@ lswt --watch
 # Watch with verbose state information
 lswt --verbose-watch
 
+# Enter interactive REPL mode
+lswt --repl
+
 # Custom output format (title,app-id,activated)
 lswt --custom taA
 
@@ -68,8 +71,22 @@ lswt --force-protocol zwlr-foreign-toplevel-management-unstable-v1
 - `-j, --json` - Output data in JSON format
 - `-w, --watch` - Run continuously and log title, identifier and app-id events
 - `-W, --verbose-watch` - Like --watch, but also log activated, fullscreen, minimized and maximized state
+- `--repl` - Enter interactive REPL mode
 - `-c <fmt>, --custom <fmt>` - Define a custom line-based output format
 - `--force-protocol <name>` - Use specified protocol (short names: `wlr`, `treeland`, `ext`)
+
+### REPL Commands
+
+When in REPL mode (`--repl`), the following commands are available:
+
+- `list`, `ls` - List all toplevels in normal format
+- `list-json`, `lj` - List all toplevels in JSON format
+- `info <id>` - Show detailed info for a toplevel by ID
+- `info <app-id>` - Show detailed info for a toplevel by app-id
+- `count` - Show number of toplevels
+- `protocol` - Show current protocol
+- `help`, `h` - Show help
+- `exit`, `quit`, `q` - Exit REPL
 
 ### Custom Format Fields
 

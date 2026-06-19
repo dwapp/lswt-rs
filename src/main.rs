@@ -1,6 +1,7 @@
 mod cli;
 mod output;
 mod protocols;
+mod repl;
 mod toplevel;
 
 use anyhow::Result;
@@ -16,9 +17,15 @@ fn main() -> Result<()> {
     app.run()?;
 
     // Output results if in list mode
-    if args.mode == Mode::List {
-        let writer = OutputWriter::new(&args.output_format, &args.custom_format);
-        writer.write_toplevels(&app.toplevels, app.used_protocol)?;
+    match args.mode {
+        Mode::List => {
+            let writer = OutputWriter::new(&args.output_format, &args.custom_format);
+            writer.write_toplevels(&app.toplevels, app.used_protocol)?;
+        }
+        Mode::Repl => {
+            repl::run_repl(&mut app)?;
+        }
+        _ => {}
     }
 
     Ok(())
