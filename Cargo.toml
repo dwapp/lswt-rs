@@ -8,7 +8,7 @@ license = "GPL-3.0-or-later"
 repository = "https://github.com/yourusername/lswt-rs"
 
 [[bin]]
-name = "lswt"
+name = "lswt-rs"
 path = "src/main.rs"
 
 [dependencies]
@@ -22,3 +22,19 @@ wayland-protocols-treeland = { version = "0.1.2", features = ["client"] }
 anyhow = "1.0"
 rustyline = "14"
 dirs-next = "2"
+
+[package.metadata.deb]
+maintainer = "lswt-rs contributors"
+copyright = "2024, lswt-rs contributors"
+license-file = ["LICENSE", "4"]
+depends = "$auto"
+section = "utils"
+priority = "optional"
+assets = [
+    ["target/release/lswt-rs", "usr/bin/", "755"],
+    ["LICENSE", "usr/share/doc/lswt-rs/", "644"],
+    ["README.md", "usr/share/doc/lswt-rs/", "644"],
+]
+extended-description = """List Wayland toplevels - A Rust implementation of lswt.
+A utility to list Wayland toplevel windows, useful for window management
+and scripting in Wayland compositors."""
